@@ -1,0 +1,10 @@
+{
+    "sigma_minimum_scalar": 1,
+    "sigma_maximum_scalar": 7,
+    "gamma": 300, 
+    "thres_method": "local_gaussian",
+    "local_thres_offset": -0.01,
+    "local_thres_block_size": 25,
+    "closing_conn": 2,
+    "pp_minsize": 180
+}
