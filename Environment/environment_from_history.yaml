@@ -1,0 +1,20 @@
+channels:
+  - defaults
+dependencies:
+  - scikit-image
+  - conda-forge::nibabel
+  - matplotlib==3.10.0
+  - conda-forge::pynrrd
+  - seaborn==0.13.2
+  - ipykernel
+  - conda-forge::nilearn
+  - conda-forge::tqdm
+  - pip=24.2
+  - pip:
+      - itk==5.4.0
+      - itk-core==5.4.0
+      - itk-filtering==5.4.0
+      - itk-io==5.4.0
+      - itk-numerics==5.4.0
+      - itk-registration==5.4.0
+      - itk-segmentation==5.4.0
