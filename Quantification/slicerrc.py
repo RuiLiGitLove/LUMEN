@@ -51,3 +51,32 @@ def get_ROI_slice_idx(ROI_node_name):
     print(f"\"max_idx\":[{max_slice_idx[0]}, {max_slice_idx[1]}, {max_slice_idx[2]}],")
     print(f"\"ROI_size\":[{ROI_size[0]}, {ROI_size[1]}, {ROI_size[2]}]")
     return None
+
+
+## Define the function to load postprocessed segmentation and endpoints
+import os
+import re
+def load_postprocessed_seg(folderPath):
+    for fname in os.listdir(folderPath):
+        path = os.path.join(folderPath, fname)
+        baseName = os.path.splitext(fname)[0]
+
+        # 1) NIfTI -> Segmentation
+        if fname.lower().endswith((".nii", ".nii.gz")):
+            segNode = slicer.util.loadSegmentation(
+                path,
+                properties={}  # no custom name: let Slicer pick
+            )
+            # Clean off any _n suffix Slicer added
+            origName = segNode.GetName()
+            cleanName = re.sub(r'_\d+$', '', origName)
+            segNode.SetName(cleanName)
+            print(f"Loaded segmentation: {cleanName}")
+
+        # 2) JSON -> Markups
+        elif fname.lower().endswith(".json"):
+            mrkNode = slicer.util.loadMarkups(path)
+            origName = mrkNode.GetName()
+            cleanName = re.sub(r'_\d+$', '', origName)
+            mrkNode.SetName(cleanName)
+            print(f"Loaded markups: {cleanName}")

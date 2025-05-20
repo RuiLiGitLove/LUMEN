@@ -340,9 +340,11 @@ def crop_TOF_and_seg(ID, side, save_dir, upsampled_TOF_path, seg_path, LSA_ROI_d
     TOF = TOF_img.get_fdata()
     seg_img = nib.load(seg_path)
     seg = seg_img.get_fdata()
+    seg = (seg>0.5).astype(np.int8)
+    seg_img.header.set_data_dtype(seg.dtype)
     if LSA_PA_mask_path != None:
         LSA_PA_mask_img = nib.load(LSA_PA_mask_path)
-        LSA_PA_mask = LSA_PA_mask_img.get_fdata()
+        LSA_PA_mask = (LSA_PA_mask_img.get_fdata()>0.5).astype(np.int8)
 
 
     if not os.path.exists(save_dir):
@@ -575,22 +577,23 @@ def get_full_branchs(key, node, metrics):
     return branchs
 
 def get_all_LSA_metrics(results_dir, metrics):
-    all_segments, LSA_tree = get_segments_and_tree_from_dir(results_dir, metrics)
+    branch_level_metrics = [i for i in metrics if i in ["length", "tortuosity", "mean_curvature", "max_curvature"]]
+    all_segments, LSA_tree = get_segments_and_tree_from_dir(results_dir, branch_level_metrics)
     n_stems = len(LSA_tree)
 
     ## Get segment-level results
     segment_metric_lsts = {}
-    for metric in metrics:
-        segment_metric_lsts[metric] = [segment[metric] for segment in all_segments]
+    for metric in branch_level_metrics:
+        if metric in all_segments[0].keys():
+            segment_metric_lsts[metric] = [segment[metric] for segment in all_segments]
 
     ## Get full-branch results
     # Get branchs
     all_branchs = []
     for stem in list(LSA_tree.keys()):
-        all_branchs += get_full_branchs(stem, LSA_tree[stem], metrics)
-    n_branchs = len(all_branchs)
+        all_branchs += get_full_branchs(stem, LSA_tree[stem], branch_level_metrics)
     branch_metric_lsts = {}
-    for metric in metrics:
+    for metric in branch_level_metrics:
         branch_metric_lsts[metric] = [branch[metric] for branch in all_branchs]
 
     results = {
@@ -606,7 +609,7 @@ def get_all_LSA_metrics(results_dir, metrics):
         longest_branch_tortuosity = all_branchs[longest_branch_idx]["tortuosity"]
         results["longest_branch_tortuosity"] = longest_branch_tortuosity
 
-    for metric in metrics:
+    for metric in branch_level_metrics:
         results[f'segment_{metric}_mean'] = np.mean(segment_metric_lsts[metric])
         results[f'segment_{metric}_std'] = np.std(segment_metric_lsts[metric])
         results[f'segment_{metric}_median'] = np.median(segment_metric_lsts[metric])
