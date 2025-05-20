@@ -11,7 +11,7 @@ We used Python version 3.12.2. Follow these steps to create the Conda environmen
     cd LUMEN
     ```
 
-2. Create the Conda environment: our pipeline was developed on a Mac OS, thus we provide the environment yaml file for mac at `Environment/environment_macos_arm64.yaml`. If on a different system, try using `Environment/environment_from_history.yaml` instead.
+2. Create the Conda environment: our pipeline was developed on a Mac OS, thus we provide the environment yaml file for mac at `Environment/environment_macos_arm64.yaml`. If on a different operating system, try using `Environment/environment_from_history.yaml` instead.
     ```sh
     conda env create -n LUMEN-env -f Environment/environment_macos_arm64.yml
     ```
@@ -38,15 +38,15 @@ To locate this script, launch Slicer, and go to `Edit -> Application Settings ->
 ![Pipeline Diagram](Images/new_pipeline_diagram.png)
 
 ### 0. Data Preperation
-Please prepare your TOF image as a compressed NIFTI file (`.nii.gz`). To ensure that the 3D structure in the image is not distorted due to unisotropic voxel size, please isotropically upsample your image to the smallest voxel dimension. To do this, we recommend using the `3dresample` function from AFNI.
+Please prepare your TOF image as a compressed NIFTI file (`.nii.gz`). To ensure that the 3D structure in the image is not distorted due to unisotropic voxel size, please isotropically upsample your image to the smallest voxel dimension (0.24mm in our case). To do this, we recommend using the `3dresample` function from AFNI.
 ```sh
 3dresample -overwrite -dxyz {d} {d} {d} -rmode Cu -prefix {output_path} -inset {input_path} # replace {d} with the minimum voxel dimension; replace with your own input and output paths
 ``` 
 ### I. Vessel Segmentation  
-This step performs automatic segmentation on the entire isotropically resampled TOF image. We recommend using the DS6 deep learning approach. Alternatively, you may also use the MSFDF pipeline. 
+This step performs automatic segmentation on the entire isotropically resampled TOF image. We found the deep learning model, DS6, to be the best performing model. Alternatively, you may also use our trained nnU-Net model or the MSFDF pipeline. 
 
-#### DS6 (Recommend)
-We recommend using the deep learning model, DS6, for better performance. The original paper  is  
+#### 1. DS6 (Recommended)
+If you are using the DS6 model, please also cite the original DS6 paper:  
 
 > S. Chatterjee et al., ‘DS6, Deformation-Aware Semi-Supervised Learning: Application to Small Vessel Segmentation with Noisy Training Data’, J Imaging, vol. 8, no. 10, p. 259, Sep. 2022, doi: 10.3390/JIMAGING8100259.
 
@@ -67,12 +67,18 @@ python main_executor.py -model_name uhura_ds6
                         -load_huggingface soumickmj/SMILEUHURA_DS6_CamSVD_UNetMSS3D_wDeform
 ```
 
-#### MSFDF (Alternative)
-The Multi-Scale Frangi Diffusive Filter (MSFDF) pipeline was published in this paper 
+#### 2. nnU-Net 
+If you are using the nnU-Net model, please also cite: 
+>Isensee, F., Jaeger, P. F., Kohl, S. A., Petersen, J., & Maier-Hein, K. H. (2021). nnU-Net: a self-configuring method for deep learning-based biomedical image segmentation. Nature methods, 18(2), 203-211.
+
+Follow the instructions at the [official nnU-Net repository](https://github.com/MIC-DKFZ/nnUNet) for installation of nnU-Net. Our trained nnU-Net model is available on Huggingface at https://huggingface.co/ruiruili/LUMEN_CamSVD_nnUNet, where we also provide detailed instructions for usage.
+
+#### 3. MSFDF
+If you are using the Multi-Scale Frangi Diffusive Filter (MSFDF) pipeline, please also cite:
 
 >M. Bernier, S. C. Cunnane, and K. Whittingstall, ‘The morphology of the human cerebrovascular system’, Hum Brain Mapp, vol. 39, no. 12, pp. 4962–4975, Dec. 2018, doi: 10.1002/HBM.24337.  
 
-We adapted its code from https://github.com/braincharter/vasculature_notebook [*last accessed on 22 Feb 2025*]. To use our version, specify your file paths in `MSFDF/MSFDF_main.py`, and run `python MSFDF/MSFDF_main.py`.
+We adapted its code from https://github.com/braincharter/vasculature_notebook [*last accessed on 22 Feb 2025*]. To use our version, specify your file paths in `MSFDF/MSFDF_main.py`, and run `python MSFDF/MSFDF_main.py` inside the `LUMEN-env` environment.
 
 ### II. LSA Quantification
 This stage uses the segmentation mask and extracts morphological metrics of the LSAs. We provide two options for defining the ROI: 
@@ -102,7 +108,9 @@ Follow instructions specified in the jupyter notebook you are following.
 
 #### 4. Postprocessing and endpoint detection (automatic)
 - Run code in step 4 of the jupyter notebook to postprocess the corrected segmentation and detect endpoints.
-- It is recommended to double check results from this step -- load into Slicer the postprocessed segmentation mask, `postprocessed_LSA_seg.nii.gz`, and all the detected endpoint files, e.g. `F1.json`. Each segment in `postprocessed_LSA_seg.nii.gz` corresponds to the LSA branches originating from a different stem. `F1.json` stores the endpoints for segment 1, and similarly for other segments. **Check that the origin endpoints are toggle selected as blue**.
+- It is recommended to double check results from this step 
+    - Load the postprocessed segmentation mask (`postprocessed_LSA_seg.nii.gz`) and all the detected endpoint files (e.g. `F1.json`) into Slicer -- we have written a dedicated function for this to avoid Slicer automatically appending '_x' to file names. Simply call `load_postprocessed_seg("path/to/postprocessed/folder")` from the python terminal inside Slicer.
+    - Each segment in `postprocessed_LSA_seg.nii.gz` corresponds to the LSA branches originating from a different stem. `F1.json` stores the endpoints for segment 1, and similarly for other segments. **Check that the origin endpoints are toggle selected as blue**.
 - If the automatically detected endpoints are wrong, you may drag them to the correct location. You may use the `Extract Centerline` module to add new endpoints to each list.
 - If you modified the endpoints, save them to the same json files.
 ![postprocessed](Images/step_4.png)
@@ -115,7 +123,7 @@ Follow step 5 in the jupyter notebook. This step will automatically launch a new
 Follow step 6 in the jupyter notebook to compute the final LSA metrics.
 
 ## Credits
-If you like this repository, please click on Star!  
+If you like this repository, please click on Star ⭐.  
 If our work helped your research, please kindly cite our paper:
 
 >Li, R., Chatterjee, S., Jiaerken, Y., Radhakrishna, C., Benjamin, P., Nannoni, S., Tozer, D.J., Markus, H.S. and Rodgers, C.T., 2024. A Deep Learning Pipeline for Analysis of the 3D Morphology of the Cerebral Small Perforating Arteries from Time-of-Flight 7 Tesla MRI. medRxiv, pp.2024-10.
@@ -130,4 +138,5 @@ If our work helped your research, please kindly cite our paper:
   publisher={Cold Spring Harbor Laboratory Press}
 }
 ```
+
 @Author: Rui Li <rl574@cam.ac.uk>  
