@@ -17,14 +17,14 @@ if VS(itk.Version.GetITKVersion()) < VS("5.0.0"):
     print("ITK 5.0.0 or newer is required.")
     sys.exit(1)
 
-from MSFDF_functions import run_itk_multiscale, run_itk_classic, FA_combine_scales, afni_3dresample, add_MIP_config, plot_MIP
+from MSFDF_functions import run_itk_multiscale, run_itk_classic, FA_combine_scales, afni_3dresample, add_MIP_config, plot_MIP, otsu_3D
 
 
 mpl.rcParams['figure.figsize'] = [15, 15]
 mpl.rcParams.update({'font.size': 20})
 np.set_printoptions(formatter={'float_kind':'{:0.4f}'.format})
 
-def run_MSFDF(ID, out_folder, TOF_path, hyperparams, config, brain_mask_path=None):
+def run_MSFDF(ID, out_folder, orig_TOF_path, hyperparams, config, brain_mask_path=None):
     # This is adapted from https://github.com/braincharter/vasculature_notebook
     #############################################################################
     ######################## Step 1: Data Preperation ###########################
@@ -34,7 +34,7 @@ def run_MSFDF(ID, out_folder, TOF_path, hyperparams, config, brain_mask_path=Non
     print(f"Step 1: Data preperation ...")
     
     ### Check if TOF is isotropic ###
-    TOF_img  = image.load_img(TOF_path)  
+    TOF_img  = image.load_img(orig_TOF_path)  
     image_size = TOF_img.shape
     voxel_sizes = TOF_img.header.get_zooms()
     print("Original voxel size is: ", voxel_sizes)
@@ -46,7 +46,7 @@ def run_MSFDF(ID, out_folder, TOF_path, hyperparams, config, brain_mask_path=Non
     
     # Check brain mask if given
     if brain_mask_path:
-        brain_mask_img = image.load_img(brain_mask_img_path)
+        brain_mask_img = image.load_img(brain_mask_path)
         brain_mask_voxel_sizes = brain_mask_img.header.get_zooms()
         is_isotropic = all(size == brain_mask_voxel_sizes[0] for size in brain_mask_voxel_sizes)
         if is_isotropic==False:
@@ -70,6 +70,9 @@ def run_MSFDF(ID, out_folder, TOF_path, hyperparams, config, brain_mask_path=Non
     TOF = (TOF - min_value) / (max_value - min_value) * (new_max - new_min) + new_min
     
     TOF_no_skull = TOF*brain_mask
+    TOF_path = os.path.join(out_folder, "normalised_upsampled_TOF.nii.gz")
+    TOF_no_skull_img = image.new_img_like(TOF_img, TOF_no_skull, copy_header=True)
+    TOF_no_skull_img.to_filename(TOF_path)
 
     ######## Specify VED filter parameters ###########
     print("Setting VED filter parameters...")
@@ -283,14 +286,14 @@ if __name__ == '__main__':
     ################### TODO: Input the following #####################
     ID_lst = ['001'] # List of IDs
     root_dir = "/path/to/this/MSFDF/folder" # path to the MSFDF folder
-    TOF_path_format = "path/to/[ID]_upsampled_TOF.nii.gz" # path format to the isotropically upsampled TOF file. [ID] will be replaced by the IDs in ID_lst.
-    out_folder_format = "path/to/output/folder" # path format to the output folder for each ID.
+    orig_TOF_path_format = "path/to/[ID]_upsampled_TOF.nii.gz" # path format to the isotropically upsampled TOF file. [ID] will be replaced by the IDs in ID_lst.
+    out_folder_format = "path/to/[ID]/output/folder" # path format to the output folder for each ID.
     brain_mask_path_format = None # optional path format to the brain mask file. 
     hyperparam_path = os.path.join(root_dir, "MSFDF_hyperparams.json")
 
     # By setting plot_MIP to True, you can plot MIP images of TOF and the final segmentation
     # But this requires saving the MIP index range for each ID in the json file 'MIP_range.json'
-    plot_MIP = True
+    plot_MIP_images = True
     MIP_dir = "cor"   # "cor" for coronal view; in MIP_range.json, you need to specify the range of slice indices in the second axis
     mip_idx_range_path= os.path.join(root_dir, "MIP_range.json")
     ###################################################################
@@ -303,15 +306,15 @@ if __name__ == '__main__':
         "filtering_method": "ITK_Multiscale", 
         "combination_method": "Maxpooling",  # tested that Maxpooling is better than FA
         "number_of_sigma_steps": 15,    # The more the better, between 10 and 15 is good
-        "plot_mip": plot_MIP,
+        "plot_mip": plot_MIP_images,
         "mip_dir": MIP_dir
     }
 
     # Run MSFDF
     for ID in ID_lst:
-        TOF_path = TOF_path_format.replace("[ID]", ID)
+        orig_TOF_path = orig_TOF_path_format.replace("[ID]", ID)
         out_folder = out_folder_format.replace("[ID]", ID)
         brain_mask_path = brain_mask_path_format.replace("[ID]", ID) if brain_mask_path_format is not None else None
-        if plot_MIP:
+        if plot_MIP_images:
             config["mip_idx_range"] = mip_idx_range_dict[ID]
-        run_MSFDF(ID, out_folder, TOF_path, hyperparams, config, brain_mask_path)
+        run_MSFDF(ID, out_folder, orig_TOF_path, hyperparams, config, brain_mask_path)

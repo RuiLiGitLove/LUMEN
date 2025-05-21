@@ -47,7 +47,7 @@ def run_itk_multiscale(in_image, TOF_img_path, brain_mask, objectness_filter, VE
     HessianPixelType = itk.SymmetricSecondRankTensor[itk.D, Dimension]
     HessianImageType = itk.Image[HessianPixelType, Dimension]
 
-    # Load TOF image
+    # Load TOF image for plotting only
     TOF_img  = image.load_img(TOF_img_path)
     TOF = TOF_img.get_fdata()
     xflipped_TOF_no_skull = np.flip(TOF*brain_mask, axis=0)
@@ -104,7 +104,7 @@ def run_itk_multiscale(in_image, TOF_img_path, brain_mask, objectness_filter, VE
     print("Finished run_itk_multiscale. Total time (min):", (time() - start)/60)
 
 
-def run_itk_classic(in_image, TOF_img_path, brain_mask, objectness_filter, classic_outfolder, itk_params, config):
+def run_itk_classic(in_image, TOF_img_path, brain_mask, objectness_filter, classic_outfolder, itk_params, config, out_classic_prefix="classic"):
     start = time()
 
     if not os.path.exists(classic_outfolder):

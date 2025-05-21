@@ -3,3 +3,4 @@ Data/
 *.nii.gz
 .DS_Store
 __pycache__/
+MSFDF/MSFDF_main_test.py
