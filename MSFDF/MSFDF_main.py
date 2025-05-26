@@ -62,15 +62,15 @@ def run_MSFDF(ID, out_folder, orig_TOF_path, hyperparams, config, brain_mask_pat
     if not os.path.exists(out_folder):
         os.makedirs(out_folder) 
 
-    # Rescale intensities inside TOF to fixed range 0-2000
-    min_value = np.min(TOF)
-    max_value = np.max(TOF)
-    new_max = 2000
-    new_min = 0
-    TOF = (TOF - min_value) / (max_value - min_value) * (new_max - new_min) + new_min
+    # # Experiment - Rescale intensities inside TOF to fixed range 0-1
+    # min_value = np.min(TOF)
+    # max_value = np.max(TOF)
+    # new_max = 1
+    # new_min = 0
+    # TOF = (TOF - min_value) / (max_value - min_value) * (new_max - new_min) + new_min
     
     TOF_no_skull = TOF*brain_mask
-    TOF_path = os.path.join(out_folder, "normalised_upsampled_TOF.nii.gz")
+    TOF_path = os.path.join(out_folder, "masked_upsampled_TOF.nii.gz")
     TOF_no_skull_img = image.new_img_like(TOF_img, TOF_no_skull, copy_header=True)
     TOF_no_skull_img.to_filename(TOF_path)
 
