@@ -126,16 +126,16 @@ Follow step 6 in the jupyter notebook to compute the final LSA metrics.
 If you like this repository, please click on Star ⭐.  
 If our work helped your research, please kindly cite our paper:
 
->Li, R., Chatterjee, S., Jiaerken, Y., Radhakrishna, C., Benjamin, P., Nannoni, S., Tozer, D.J., Markus, H.S. and Rodgers, C.T., 2024. A Deep Learning Pipeline for Analysis of the 3D Morphology of the Cerebral Small Perforating Arteries from Time-of-Flight 7 Tesla MRI. medRxiv, pp.2024-10.
+>Li, Rui, et al. "LUMEN–A Deep Learning Pipeline for Analysis of the 3D Morphology of the Cerebral Lenticulostriate Arteries from Time-of-Flight 7T MRI." NeuroImage (2025): 121377.
 
 ```
-@article{li2024deep,
-  title={A Deep Learning Pipeline for Analysis of the 3D Morphology of the Cerebral Small Perforating Arteries from Time-of-Flight 7 Tesla MRI},
-  author={Li, Rui and Chatterjee, Soumick and Jiaerken, Yeerfan and Radhakrishna, Chethan and Benjamin, Philip and Nannoni, Stefania and Tozer, Daniel J and Markus, Hugh S and Rodgers, Christopher T},
-  journal={medRxiv},
-  pages={2024--10},
-  year={2024},
-  publisher={Cold Spring Harbor Laboratory Press}
+@article{li2025lumen,
+  title={LUMEN--A Deep Learning Pipeline for Analysis of the 3D Morphology of the Cerebral Lenticulostriate Arteries from Time-of-Flight 7T MRI},
+  author={Li, Rui and Chatterjee, Soumick and Jiaerken, Yeerfan and Zhou, Xia and Radhakrishna, Chethan and Benjamin, Philip and Nannoni, Stefania and Tozer, Daniel J and Markus, Hugh S and Rodgers, Christopher T},
+  journal={NeuroImage},
+  pages={121377},
+  year={2025},
+  publisher={Elsevier}
 }
 ```
 
