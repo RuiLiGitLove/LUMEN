@@ -1,5 +1,6 @@
 # LUMEN
-This is the official code repository for the **LUMEN** (**L**enticulostriate artery **U**ltra-high-field **M**orphology **E**xtraction and quantificatio**N**) pipeline. For details, please refer to paper: Li, Rui, et al. "LUMEN–A Deep Learning Pipeline for Analysis of the 3D Morphology of the Cerebral Lenticulostriate Arteries from Time-of-Flight 7T MRI." NeuroImage (2025): 121377.   
+The official code repository for the **LUMEN** (**L**enticulostriate artery **U**ltra-high-field **M**orphology **E**xtraction and quantificatio**N**) pipeline. \
+:page_facing_up: **Paper**: Li, Rui, et al. "LUMEN–A Deep Learning Pipeline for Analysis of the 3D Morphology of the Cerebral Lenticulostriate Arteries from Time-of-Flight 7T MRI." NeuroImage (2025): 121377. :link: DOI: [10.1016/j.neuroimage.2025.121377](https://doi.org/10.1016/j.neuroimage.2025.121377)
 
 ## Configuration
 ### Python Environment
@@ -139,4 +140,4 @@ If our work helped your research, please kindly cite our paper:
 }
 ```
 
-@Author: Rui Li <rl574@cam.ac.uk>  
+@Author: Rui Li <rui.ruili@outlook.com>  
