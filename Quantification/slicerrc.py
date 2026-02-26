@@ -42,9 +42,12 @@ def get_ROI_slice_idx(ROI_node_name):
     inverse_affine = np.linalg.inv(affine_matrix)
     min_world_idx = [bounds[0], bounds[2], bounds[4], 1.0]
     max_world_idx = [bounds[1], bounds[3], bounds[5], 1.0]
-    min_slice_idx = np.round(np.dot(inverse_affine, min_world_idx)[:-1]).astype(int)
-    max_slice_idx = np.round(np.dot(inverse_affine, max_world_idx)[:-1]).astype(int)
-    ROI_size =max_slice_idx-min_slice_idx+1
+    min_world_idx_ijk = np.round(np.dot(inverse_affine, min_world_idx)[:-1]).astype(int)
+    max_world_idx_ijk = np.round(np.dot(inverse_affine, max_world_idx)[:-1]).astype(int)
+    min_slice_idx = np.minimum(min_world_idx_ijk, max_world_idx_ijk) # element-wise min
+    max_slice_idx = np.maximum(min_world_idx_ijk, max_world_idx_ijk) # element-wise max
+
+    ROI_size = max_slice_idx - min_slice_idx + 1
 
     print("ROI location:")
     print(f"\"min_idx\":[{min_slice_idx[0]}, {min_slice_idx[1]}, {min_slice_idx[2]}],")
