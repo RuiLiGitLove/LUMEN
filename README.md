@@ -47,14 +47,19 @@ Please prepare your TOF image as a compressed NIFTI file (`.nii.gz`). To ensure 
 ### I. Vessel Segmentation  
 This step performs automatic segmentation on the entire isotropically resampled TOF image. We found the deep learning model, DS6, to be the best performing model. Alternatively, you may also use our trained nnU-Net model or the MSFDF pipeline. 
 
-#### 1. DS6 (Recommended)
-If you are using the DS6 model, please also cite the original DS6 paper:  
+#### 1. DS6
+Please find more details about the DS6 model at:  
 
 > S. Chatterjee et al., ‘DS6, Deformation-Aware Semi-Supervised Learning: Application to Small Vessel Segmentation with Noisy Training Data’, J Imaging, vol. 8, no. 10, p. 259, Sep. 2022, doi: 10.3390/JIMAGING8100259.
 
-A newer version of the DS6 pipeline has been published as SPOCKMIP at https://github.com/soumickmj/spockmip. Please clone this repository and follow instructions for installation. Our finetuned DS6 model is available on Huggingface at https://huggingface.co/soumickmj/SMILEUHURA_DS6_CamSVD_UNetMSS3D_wDeform.
+A newer version of the DS6 pipeline has been published as SPOCKMIP at https://github.com/soumickmj/spockmip. Please clone this repository and install required packages in a new conda environment:
+```
+conda env create -p path/to/new/conda/env -f SPOCKMIP/environment.yaml -n uhura_dev
+conda activate uhura_dev
+pip install git+https://github.com/airlab-unibas/airlab.git
+``` 
 
-To run our fine-tuned model on your data, run the following command:
+Our finetuned DS6 model is available on Huggingface at https://huggingface.co/soumickmj/SMILEUHURA_DS6_CamSVD_UNetMSS3D_wDeform. To run our fine-tuned model on your data, run the following command:
 ```sh
 conda activate uhura_dev  # This is the DS6 environment name
 python main_executor.py -model_name uhura_ds6
