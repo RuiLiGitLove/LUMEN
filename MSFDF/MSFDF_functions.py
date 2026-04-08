@@ -38,8 +38,9 @@ def run_itk_multiscale(in_image, TOF_img_path, brain_mask, objectness_filter, VE
     sigma_maximum = itk_params['sigma_maximum']
     number_of_sigma_steps = itk_params['number_of_sigma_steps']
 
-    mip_axis = config['mip_axis']
-    mip_view = config['mip_view']
+    if config["plot_mip"]:
+        mip_axis = config['mip_axis']
+        mip_view = config['mip_view']
     
     ImageType = type(in_image)
     Dimension = in_image.GetImageDimension()  #would be 3
@@ -96,8 +97,9 @@ def run_itk_multiscale(in_image, TOF_img_path, brain_mask, objectness_filter, VE
             xflipped_ved_array = np.flip(ved_array, axis=0)
 
             ############### Plotting #################
-            VED_title = "VED for: " + str(sigma) + ": " + str(step+1) + " of " + str(number_of_sigma_steps)
-            plot_two_MIPs(xflipped_TOF_no_skull, "TOF", xflipped_ved_array, VED_title, out_path.replace(".nii.gz", "_MIP.png"), mip_axis, mip_view)
+            if config["plot_mip"]:
+                VED_title = "VED for: " + str(sigma) + ": " + str(step+1) + " of " + str(number_of_sigma_steps)
+                plot_two_MIPs(xflipped_TOF_no_skull, "TOF", xflipped_ved_array, VED_title, out_path.replace(".nii.gz", "_MIP.png"), mip_axis, mip_view)
         else:
             print(f"{out_path} exists.")
         

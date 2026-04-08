@@ -1,6 +1,10 @@
 Data/
+Env/
 *.nii
 *.nii.gz
 .DS_Store
 __pycache__/
 MSFDF/MSFDF_main_test.py
+*.peta4-icelake
+*.wilkes3
+MSFDF/run_MSFDF_HPC.py

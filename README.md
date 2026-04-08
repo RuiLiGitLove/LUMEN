@@ -80,7 +80,7 @@ If you are using the Multi-Scale Frangi Diffusive Filter (MSFDF) pipeline, pleas
 
 >M. Bernier, S. C. Cunnane, and K. Whittingstall, ‘The morphology of the human cerebrovascular system’, Hum Brain Mapp, vol. 39, no. 12, pp. 4962–4975, Dec. 2018, doi: 10.1002/HBM.24337.  
 
-We adapted its code from https://github.com/braincharter/vasculature_notebook [*last accessed on 22 Feb 2025*]. To use our version, specify your file paths in `MSFDF/MSFDF_main.py`, and run `python MSFDF/MSFDF_main.py` inside the `LUMEN-env` environment.
+We adapted its code from https://github.com/braincharter/vasculature_notebook [*last accessed on 22 Feb 2025*]. To use our version, specify your file paths in `MSFDF/MSFDF_main.py`, and run `python MSFDF/run_MSFDF.py` inside the `LUMEN-env` environment.
 
 ### II. LSA Quantification
 This stage uses the segmentation mask and extracts morphological metrics of the LSAs. We provide two options for defining the ROI: 

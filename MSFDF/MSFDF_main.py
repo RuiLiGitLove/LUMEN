@@ -1,6 +1,7 @@
 import os
 import sys  
 import json 
+from glob import glob
 import warnings
 warnings.filterwarnings("ignore")
 import shutil
@@ -62,18 +63,20 @@ def run_MSFDF(ID, out_folder, orig_TOF_path, hyperparams, config, brain_mask_pat
     if not os.path.exists(out_folder):
         os.makedirs(out_folder) 
 
-    # # Experiment - Rescale intensities inside TOF to fixed range 0-1
-    # min_value = np.min(TOF)
-    # max_value = np.max(TOF)
-    # new_max = 1
-    # new_min = 0
-    # TOF = (TOF - min_value) / (max_value - min_value) * (new_max - new_min) + new_min
+    # Experiment - Rescale intensities inside TOF to fixed range 0-1
+    min_value = np.min(TOF)
+    max_value = np.max(TOF)
+    if abs(max_value-min_value) < 1e-6:
+        TOF[:] = 0.001
+    else:   
+        TOF = (TOF - min_value) / (max_value - min_value)
     
+    # Save normalised skull-stripped TOF for vessel filtering step
     TOF_no_skull = TOF*brain_mask
     TOF_path = os.path.join(out_folder, "masked_upsampled_TOF.nii.gz")
     TOF_no_skull_img = image.new_img_like(TOF_img, TOF_no_skull, copy_header=True)
     TOF_no_skull_img.to_filename(TOF_path)
-
+    
     ######## Specify VED filter parameters ###########
     print("Setting VED filter parameters...")
     brightvessels = True   # True for TOF
@@ -170,8 +173,13 @@ def run_MSFDF(ID, out_folder, orig_TOF_path, hyperparams, config, brain_mask_pat
         VED_images=nilearn.image.load_img(os.path.join(VED_outfolder, "*_VED.nii.gz"), wildcards=True)
         if config["combination_method"] == "Maxpooling":
             print("+-+- Compute max image")
-            VED_max_img=nilearn.image.math_img("np.max(a, axis=3)", a=VED_images)
+            VED_image_files = glob(os.path.join(VED_outfolder, "*_VED.nii.gz"))
+            VED_max_img = image.load_img(VED_image_files[0])
+            for f in VED_image_files[1:]:
+                img = image.load_img(f)
+                VED_max_img = nilearn.image.math_img("np.maximum(a, b)", a=VED_max_img, b=img)
             VED_max_img.to_filename(out_combined_path)
+
             if config['plot_mip']:
                 plot_MIP([TOF_no_skull, VED_max_img.get_fdata()],
                          ["TOF", "VED max"],
@@ -181,6 +189,7 @@ def run_MSFDF(ID, out_folder, orig_TOF_path, hyperparams, config, brain_mask_pat
                          os.path.join(out_folder, "combined_filtered_MIP.png"))
 
         elif config["combination_method"] == "FA":
+            VED_images=nilearn.image.load_img(os.path.join(VED_outfolder, "*_VED.nii.gz"), wildcards=True)
             print("+-+- Compute factory analysis")
             fact_data = FA_combine_scales(VED_images, sigma_minimum, sigma_maximum)
             fact_img = image.new_img_like(TOF_img, fact_data)
@@ -202,8 +211,6 @@ def run_MSFDF(ID, out_folder, orig_TOF_path, hyperparams, config, brain_mask_pat
     ###############################################
     ########### Step 4: Thresholding   ############
     ###############################################
-    # Create an additional folder to save results from thresholding
-  
     out_seg_path = os.path.join(out_folder, "thresholded.nii.gz")
     if not os.path.exists(out_seg_path):
         print("---------------------------------")
@@ -246,7 +253,7 @@ def run_MSFDF(ID, out_folder, orig_TOF_path, hyperparams, config, brain_mask_pat
     #################################################
     ########### Step 5: Post-processing  ############
     #################################################
-    out_postprocessed_path = os.path.join(out_folder, "final_segmentation.nii.gz")
+    out_postprocessed_path = os.path.join(out_folder, f"{ID}_final_segmentation.nii.gz")
     if not os.path.exists(out_postprocessed_path):
         print("---------------------------------")
         print("Step 5: Post-processing...")
@@ -277,44 +284,27 @@ def run_MSFDF(ID, out_folder, orig_TOF_path, hyperparams, config, brain_mask_pat
     else:
         print("Final postprocessed segmentation already exists. Skipping Step 5.")
     
+    ##########################################
+    ########### Step 6: Cleaning  ############
+    ##########################################
+    if config["clear_inter_output"]:
+        print("Cleaning intermediate files...")
+        paths_to_remove = [TOF_path,out_combined_path, out_seg_path]
+        if config['plot_mip']:
+            paths_to_remove += glob(os.path.join(out_folder, "*.png"))
+        for p in paths_to_remove:
+            if os.path.exists(p):
+                os.remove(p)
+
+        folders_to_remove = [VED_outfolder] if config["filtering_method"] == "ITK_Multiscale" else []
+        for f in folders_to_remove:
+            if os.path.exists(f):
+                shutil.rmtree(f)
+
     print("Finished MSFDF pipeline")
     print("------------------------")
 
 
    
 if __name__ == '__main__':
-    ################### TODO: Input the following #####################
-    ID_lst = ['001'] # List of IDs
-    root_dir = "/path/to/this/MSFDF/folder" # path to the MSFDF folder
-    orig_TOF_path_format = "path/to/[ID]_upsampled_TOF.nii.gz" # path format to the isotropically upsampled TOF file. [ID] will be replaced by the IDs in ID_lst.
-    out_folder_format = "path/to/[ID]/output/folder" # path format to the output folder for each ID.
-    brain_mask_path_format = None # optional path format to the brain mask file. 
-    hyperparam_path = os.path.join(root_dir, "MSFDF_hyperparams.json")
-
-    # By setting plot_MIP to True, you can plot MIP images of TOF and the final segmentation
-    # But this requires saving the MIP index range for each ID in the json file 'MIP_range.json'
-    plot_MIP_images = True
-    MIP_dir = "cor"   # "cor" for coronal view; in MIP_range.json, you need to specify the range of slice indices in the second axis
-    mip_idx_range_path= os.path.join(root_dir, "MIP_range.json")
-    ###################################################################
-    os.chdir(root_dir)
-    hyperparams = json.load(open(hyperparam_path, "r"))
-    mip_idx_range_dict = json.load(open(mip_idx_range_path, "r"))
-
-    # Usually don't change this config
-    config = { 
-        "filtering_method": "ITK_Multiscale", 
-        "combination_method": "Maxpooling",  # tested that Maxpooling is better than FA
-        "number_of_sigma_steps": 15,    # The more the better, between 10 and 15 is good
-        "plot_mip": plot_MIP_images,
-        "mip_dir": MIP_dir
-    }
-
-    # Run MSFDF
-    for ID in ID_lst:
-        orig_TOF_path = orig_TOF_path_format.replace("[ID]", ID)
-        out_folder = out_folder_format.replace("[ID]", ID)
-        brain_mask_path = brain_mask_path_format.replace("[ID]", ID) if brain_mask_path_format is not None else None
-        if plot_MIP_images:
-            config["mip_idx_range"] = mip_idx_range_dict[ID]
-        run_MSFDF(ID, out_folder, orig_TOF_path, hyperparams, config, brain_mask_path)
+    print("MSFDF_main.py is not meant to be run directly.")
