@@ -25,7 +25,7 @@ We used Python version 3.12.2. Follow these steps to create the Conda environmen
 In addition, please install the [AFNI (Analysis of Functional NeuroImages)](https://afni.nimh.nih.gov/) software to your system for isotropic resampling of the TOF images. The version of AFNI that we used was 17.0.00.
 
 ### 3D Slicer
-The quantification stage of our pipeline requires the use of the free software, [3D Slicer](https://www.slicer.org/). Please install the latest version of Slicer to your system. We tested on version 5.6.2.  
+The quantification stage of our pipeline requires the use of the free software, [3D Slicer](https://www.slicer.org/). Please install the latest version of Slicer to your system. We tested on version 5.6.2 and 5.10.0.  
 #### Download Extensions
 Download the following extensions from Slicer "Extensions Manager"  ![Slicer extensions manager](Images/slicer_extensions_manager.png):
 - SlicerVMTK
