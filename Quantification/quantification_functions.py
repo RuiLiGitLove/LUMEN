@@ -331,7 +331,7 @@ def postprocess_LSA_seg(LSA_nrrd_path, ref_img_path, save_dir, out_seg_name, ups
 
     postprocessed_save_path = os.path.join(save_dir, out_seg_name)
     nib.save(upsampled_labelled_img, postprocessed_save_path)
-    return postprocessed_save_path
+    return postprocessed_save_path, island_endpoint_save_path
 
 
 

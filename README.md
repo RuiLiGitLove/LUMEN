@@ -100,7 +100,7 @@ This stage uses the segmentation mask and extracts morphological metrics of the 
 #### 1. Define LSA ROI (automatic/manual)
 Manual method:
 - Launch 3D Slicer and load the isotropically sampled TOF file as 'Volume'.  
-- Go to `Volume Rendering` module and toggle visibility. In `Inputs -> Property`, you may select the custom `MIP_VolumeProperty` (loaded in .slicerrc.py).  
+- Go to `Volume Rendering` module and toggle visibility. In `Inputs -> Property`, you may select the custom `MIP_VolumeProperty` (loaded in .slicerrc.py). This was a custom volume property setting that worked well for the visualisation of CamSVD data. However, it may not work well for your data, so you may want to edit this volume property in 3D Slicer and overwrite the file. 
 - Select `Display ROI`, drag the ROI box to cover the LSAs and their origins, and use the `get_ROI_slicer_idx()` function in the Python Console as shown to get the location of the ROI. **Make sure to have only one volume file loaded at this step to obtain the correct ROI location!**
 - Save the index location to `Quantification/LSA_ROI_location.json`. Specify `ID` and `side`.  
 
@@ -114,7 +114,7 @@ Follow instructions specified in the jupyter notebook you are following.
 
 **Tips**:
 - Clicking on the endpoints in 3D view can take you to those locations directly in the slice views.
-- Some tools that we find useful for this step are `Paint`, `Eraser`, `Scissors`, `Draw Tube` (circled in image below). `Draw Tube` is particularly useful for filling parts of LSAs that are missed in the automatic segmentation -- **always create a new segment when using `Draw Tube` to avoid overwritting an existing segment!**
+- Some tools that we find useful for this step are `Paint`, `Eraser`, `Scissors`, `Draw Tube` (circled in image below) and `Islands`. `Draw Tube` is particularly useful for filling parts of LSAs that are missed in the automatic segmentation -- **always create a new segment when using `Draw Tube` to avoid overwritting an existing segment!** `Islands` is particularly useful for removing or keeping certain islands.
 ![manual correction](Images/step_3.png)
 
 
