@@ -25,7 +25,7 @@ We used Python version 3.12.2. Follow these steps to create the Conda environmen
 In addition, please install the [AFNI (Analysis of Functional NeuroImages)](https://afni.nimh.nih.gov/) software to your system for isotropic resampling of the TOF images. The version of AFNI that we used was 17.0.00.
 
 ### 3D Slicer
-The quantification stage of our pipeline requires the use of the free software, [3D Slicer](https://www.slicer.org/). Please install the latest version of Slicer to your system. We tested on version 5.6.2.  
+The quantification stage of our pipeline requires the use of the free software, [3D Slicer](https://www.slicer.org/). Please install the latest version of Slicer to your system. We tested on version 5.6.2 and 5.10.0.  
 #### Download Extensions
 Download the following extensions from Slicer "Extensions Manager"  ![Slicer extensions manager](Images/slicer_extensions_manager.png):
 - SlicerVMTK
@@ -44,17 +44,25 @@ Please prepare your TOF image as a compressed NIFTI file (`.nii.gz`). To ensure 
 ```sh
 3dresample -overwrite -dxyz {d} {d} {d} -rmode Cu -prefix {output_path} -inset {input_path} # replace {d} with the minimum voxel dimension; replace with your own input and output paths
 ``` 
+
+---
+
 ### I. Vessel Segmentation  
 This step performs automatic segmentation on the entire isotropically resampled TOF image. We found the deep learning model, DS6, to be the best performing model. Alternatively, you may also use our trained nnU-Net model or the MSFDF pipeline. 
 
-#### 1. DS6 (Recommended)
-If you are using the DS6 model, please also cite the original DS6 paper:  
+#### 1. DS6
+Please find more details about the DS6 model at:  
 
 > S. Chatterjee et al., ‘DS6, Deformation-Aware Semi-Supervised Learning: Application to Small Vessel Segmentation with Noisy Training Data’, J Imaging, vol. 8, no. 10, p. 259, Sep. 2022, doi: 10.3390/JIMAGING8100259.
 
-A newer version of the DS6 pipeline has been published as SPOCKMIP at https://github.com/soumickmj/spockmip. Please clone this repository and follow instructions for installation. Our finetuned DS6 model is available on Huggingface at https://huggingface.co/soumickmj/SMILEUHURA_DS6_CamSVD_UNetMSS3D_wDeform.
+A newer version of the DS6 pipeline has been published as SPOCKMIP at https://github.com/soumickmj/spockmip. Please clone this repository and install required packages in a new conda environment:
+```
+conda env create -p path/to/new/conda/env -f SPOCKMIP/environment.yaml -n uhura_dev
+conda activate uhura_dev
+pip install git+https://github.com/airlab-unibas/airlab.git
+``` 
 
-To run our fine-tuned model on your data, run the following command:
+Our finetuned DS6 model is available on Huggingface at https://huggingface.co/soumickmj/SMILEUHURA_DS6_CamSVD_UNetMSS3D_wDeform. To run our fine-tuned model on your data, run the following command:
 ```sh
 conda activate uhura_dev  # This is the DS6 environment name
 python main_executor.py -model_name uhura_ds6
@@ -82,6 +90,8 @@ If you are using the Multi-Scale Frangi Diffusive Filter (MSFDF) pipeline, pleas
 
 We adapted its code from https://github.com/braincharter/vasculature_notebook [*last accessed on 22 Feb 2025*]. To use our version, specify your file paths in `MSFDF/MSFDF_main.py`, and run `python MSFDF/run_MSFDF.py` inside the `LUMEN-env` environment.
 
+---
+
 ### II. LSA Quantification
 This stage uses the segmentation mask and extracts morphological metrics of the LSAs. We provide two options for defining the ROI: 
 1. **(Paper method) Pre-defined LSA perfusion area mask** -- For this, provide your mask coregistered to each subject's isotropically sampled TOF image as a compressed nifti file (`.nii.gz.`) and follow `Quantification/quantification_auto_ROI.ipynb`. 
@@ -90,7 +100,7 @@ This stage uses the segmentation mask and extracts morphological metrics of the 
 #### 1. Define LSA ROI (automatic/manual)
 Manual method:
 - Launch 3D Slicer and load the isotropically sampled TOF file as 'Volume'.  
-- Go to `Volume Rendering` module and toggle visibility. In `Inputs -> Property`, you may select the custom `MIP_VolumeProperty` (loaded in .slicerrc.py).  
+- Go to `Volume Rendering` module and toggle visibility. In `Inputs -> Property`, you may select the custom `MIP_VolumeProperty` (loaded in .slicerrc.py). This was a custom volume property setting that worked well for the visualisation of CamSVD data. However, it may not work well for your data, so you may want to edit this volume property in 3D Slicer and overwrite the file. 
 - Select `Display ROI`, drag the ROI box to cover the LSAs and their origins, and use the `get_ROI_slicer_idx()` function in the Python Console as shown to get the location of the ROI. **Make sure to have only one volume file loaded at this step to obtain the correct ROI location!**
 - Save the index location to `Quantification/LSA_ROI_location.json`. Specify `ID` and `side`.  
 
@@ -104,7 +114,7 @@ Follow instructions specified in the jupyter notebook you are following.
 
 **Tips**:
 - Clicking on the endpoints in 3D view can take you to those locations directly in the slice views.
-- Some tools that we find useful for this step are `Paint`, `Eraser`, `Scissors`, `Draw Tube` (circled in image below). `Draw Tube` is particularly useful for filling parts of LSAs that are missed in the automatic segmentation -- **always create a new segment when using `Draw Tube` to avoid overwritting an existing segment!**
+- Some tools that we find useful for this step are `Paint`, `Eraser`, `Scissors`, `Draw Tube` (circled in image below) and `Islands`. `Draw Tube` is particularly useful for filling parts of LSAs that are missed in the automatic segmentation -- **always create a new segment when using `Draw Tube` to avoid overwritting an existing segment!** `Islands` is particularly useful for removing or keeping certain islands.
 ![manual correction](Images/step_3.png)
 
 

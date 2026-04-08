@@ -331,7 +331,7 @@ def postprocess_LSA_seg(LSA_nrrd_path, ref_img_path, save_dir, out_seg_name, ups
 
     postprocessed_save_path = os.path.join(save_dir, out_seg_name)
     nib.save(upsampled_labelled_img, postprocessed_save_path)
-    return postprocessed_save_path
+    return postprocessed_save_path, island_endpoint_save_path
 
 
 
@@ -478,7 +478,14 @@ def get_curvature(control_points, downsample_distance=0.5, return_kappa_control_
     else:
         return kappa[1:n-1]
 
-def get_segment_info_from_json(json_path, metrics, downsample_distance=0.5):
+def get_intensities(control_point_positions, affine_matrix, image):
+    voxel_idx = get_voxel_idx(control_point_positions, affine_matrix)
+    unique_voxel_idx = np.unique(voxel_idx, axis=0)
+    intensities = image[unique_voxel_idx[:,0], unique_voxel_idx[:,1], unique_voxel_idx[:,2]]
+    return intensities
+
+
+def get_segment_info_from_json(json_path, metrics, affine_matrix=None, upsampled_TOF=None, downsample_distance=0.5):
     data = json.load(open(json_path, 'r'))
     control_points = data["markups"][0]["controlPoints"]
     start_point = control_points[0]["position"]
@@ -494,22 +501,65 @@ def get_segment_info_from_json(json_path, metrics, downsample_distance=0.5):
         curve_length = get_length(control_point_positions)
         segment_info["length"] = curve_length
     if "tortuosity" in metrics:
-        tortuosity = get_tortuosity(start_point, end_point, curve_length)
+        tortuosity = get_tortuosity(start_point, end_point, segment_info["length"])
         segment_info["tortuosity"] = tortuosity
     if ("mean_curvature" in metrics) or ("max_curvature" in metrics):
         kappa, kappa_control_points = get_curvature(control_point_positions, downsample_distance=downsample_distance)
         
         mean_curvature = np.mean(kappa)
         max_curvature = np.max(kappa)
+
         segment_info["kappa"] = kappa
         segment_info["mean_curvature"] = mean_curvature
         segment_info["max_curvature"] = max_curvature
         segment_info["kappa_control_points"] = kappa_control_points
-
+    if ("intensity_variation" in metrics) or ("intensity_mean" in metrics):
+        intensities = get_intensities(control_point_positions, affine_matrix, upsampled_TOF)
+        segment_info["intensities"] = intensities
+        segment_info["intensity_mean"] = np.mean(intensities)
+        segment_info["intensity_variation"] = np.std(intensities)
+    if "height" in metrics:
+        voxel_idx = get_voxel_idx(control_point_positions, affine_matrix)
+        segment_info["height"] = voxel_idx[:,2].max()-voxel_idx[:,2].min()
     return segment_info
 
+def merge_two_segments(parent_segment, child_segment, metrics, downsample_distance, upsampled_TOF, affine_matrix):
+    # parent end is child start
+    control_point_positions = np.concatenate((parent_segment["control_point_positions"], child_segment["control_point_positions"][1:]), axis=0)
+    combined_seg_info = {
+        "start": parent_segment["start"],
+        "end": child_segment["end"],
+        "control_point_positions": control_point_positions
+    }
+    
+    if "length" in metrics:
+        curve_length = get_length(control_point_positions)
+        combined_seg_info["length"] = curve_length
+    if "tortuosity" in metrics:
+        tortuosity = get_tortuosity(combined_seg_info['start'], combined_seg_info['end'], combined_seg_info["length"])
+        combined_seg_info["tortuosity"] = tortuosity
+    if ("mean_curvature" in metrics) or ("max_curvature" in metrics):
+        kappa, kappa_control_points = get_curvature(control_point_positions, downsample_distance=downsample_distance)
+        
+        mean_curvature = np.mean(kappa)
+        max_curvature = np.max(kappa)
 
-def get_segments_and_tree_from_dir(root_dir, metrics, segment_name_pattern = r"^C\d+ \(\d+\)$", downsample_distance=0.5):
+        combined_seg_info["kappa"] = kappa
+        combined_seg_info["mean_curvature"] = mean_curvature
+        combined_seg_info["max_curvature"] = max_curvature
+        combined_seg_info["kappa_control_points"] = kappa_control_points
+    if ("intensity_variation" in metrics) or ("intensity_mean" in metrics):
+        intensities = get_intensities(control_point_positions, affine_matrix, upsampled_TOF)
+        combined_seg_info["intensities"] = intensities
+        combined_seg_info["intensity_mean"] = np.mean(intensities)
+        combined_seg_info["intensity_variation"] = np.std(intensities)
+    if "height" in metrics:
+        voxel_idx = get_voxel_idx(control_point_positions, affine_matrix)
+        combined_seg_info["height"] = voxel_idx[:,2].max()-voxel_idx[:,2].min()
+    return combined_seg_info
+    
+
+def get_segments_and_tree_from_dir(root_dir, metrics, segment_name_pattern = r"^C\d+ \(\d+\)$", affine_matrix=None, upsampled_TOF=None, downsample_distance=0.5, terminal_min_length=None):
     original_dir = os.getcwd()
     os.chdir(root_dir)
     stem_json_name_pattern = segment_name_pattern.replace("$", r"\.mrk\.json$")
@@ -520,28 +570,53 @@ def get_segments_and_tree_from_dir(root_dir, metrics, segment_name_pattern = r"^
         for file_name in files:
             if re.match(stem_json_name_pattern, file_name): # if the file has a name that matches Cx (0).mkr.json where x is any number
                 segment_name = file_name.replace(".mrk.json", "")
-                segment_info = get_segment_info_from_json(file_name, metrics, downsample_distance=downsample_distance)
-                all_segments.append(segment_info)
-                LSA_tree[segment_name] = segment_info
+                segment_info = get_segment_info_from_json(file_name, metrics, affine_matrix=affine_matrix, upsampled_TOF=upsampled_TOF, downsample_distance=downsample_distance)
+                segment_info["name"] = segment_name
+                remove_seg = (terminal_min_length is not None) and (segment_name not in dirs) and (segment_info["length"] < terminal_min_length)
+                if not remove_seg:
+                    all_segments.append(segment_info)
+                    LSA_tree[segment_name] = segment_info
 
+                
         for dir_name in dirs: # If there is a directory for a branch, that branch has children, so we need to run this function recursively
             if re.match(segment_name_pattern, dir_name): # if the directory name matches Cx (0)
                 dir_path = os.path.join(root_dir, dir_name)
-                children_segments, LSA_tree[dir_name]["children"] = get_segments_and_tree_from_dir(dir_path, metrics, downsample_distance=downsample_distance)
-                all_segments += children_segments
+                children_segments, children_LSA_tree = get_segments_and_tree_from_dir(dir_path, metrics, affine_matrix=affine_matrix, 
+                                                                                      upsampled_TOF=upsampled_TOF, 
+                                                                                      downsample_distance=downsample_distance, 
+                                                                                      terminal_min_length=terminal_min_length)
+                if len(children_segments) == 1:
+                    # merge children segment into parent segment
+                    parent_segment = LSA_tree[dir_name]
+                    child_segment = children_segments[0]
+                    parent_name = dir_name
+                    child_name = list(children_LSA_tree.keys())[0]
+                    print(f"Merging {child_name} into {parent_name}")
+                    merged_segment = merge_two_segments(parent_segment, child_segment, metrics, downsample_distance, upsampled_TOF, affine_matrix)
+                    merged_name = f"{parent_name}-{child_name}"
+                    merged_segment['name'] = merged_name
+                    # Remove parent segment from tree and add merged segment
+                    del LSA_tree[parent_name]
+                    LSA_tree[merged_name] = merged_segment
+                    # Remove parent segment from all_segments and add merged segment
+                    all_segments = [d for d in all_segments if d['name'] != parent_name]
+                    all_segments.append(merged_segment)
+
+                else:
+                    LSA_tree[dir_name]["children"] = children_LSA_tree
+                    all_segments += children_segments
 
         # Prevent os.walk from going into subdirectories
         dirs[:] = []
     os.chdir(original_dir)
     return all_segments, LSA_tree
 
-
-def get_full_branchs(key, node, metrics):
+def get_full_branchs(key, node, metrics, affine_matrix=None, upsampled_TOF=None):
     '''This function gets the full branchs from a node'''
     if "children" in node:
         branchs = []
         for child_key in list(node["children"].keys()):
-            child_branchs = get_full_branchs(child_key, node["children"][child_key], metrics)
+            child_branchs = get_full_branchs(child_key, node["children"][child_key], metrics, affine_matrix, upsampled_TOF)
             # Add current node to children branchs 
             for child_branch in child_branchs:
                 seg_to_add = {
@@ -553,6 +628,8 @@ def get_full_branchs(key, node, metrics):
                     seg_to_add["length"] = node["length"]+child_branch["length"]
                 if ("mean_curvature" in metrics) or ("max_curvature" in metrics):
                     seg_to_add["kappa"] = np.concatenate((node['kappa'], child_branch['kappa']))
+                if ("intensity_variation" in metrics) or ("height" in metrics) or ("intensity_mean" in metrics):
+                    seg_to_add["control_point_positions"] = np.concatenate((node['control_point_positions'], child_branch['control_point_positions']), axis=0)
                 branchs.append(seg_to_add)
             
     else:
@@ -565,6 +642,8 @@ def get_full_branchs(key, node, metrics):
             branchs[0]["length"] = node["length"]
         if ("mean_curvature" in metrics) or ("max_curvature" in metrics):
             branchs[0]["kappa"] = node["kappa"]
+        if ("intensity_variation" in metrics) or ("height" in metrics) or ("intensity_mean" in metrics):
+            branchs[0]["control_point_positions"] = node["control_point_positions"]
 
     for branch in branchs:
         if "tortuosity" in metrics:
@@ -573,12 +652,42 @@ def get_full_branchs(key, node, metrics):
             branch["mean_curvature"] = np.mean(branch["kappa"])
         if "max_curvature" in metrics:
             branch["max_curvature"] = np.max(branch["kappa"])
+        if ("intensity_variation" in metrics) or ("intensity_mean" in metrics):
+            intensities = get_intensities(branch["control_point_positions"], affine_matrix, upsampled_TOF)
+            branch["intensities"] = intensities
+            branch["intensity_mean"] = np.mean(intensities)
+            branch["intensity_variation"] = np.std(intensities)
+        if "height" in metrics:
+            voxel_idx = get_voxel_idx(branch['control_point_positions'], affine_matrix)
+            branch["height"] = voxel_idx[:,2].max()-voxel_idx[:,2].min()
     
     return branchs
 
-def get_all_LSA_metrics(results_dir, metrics):
-    branch_level_metrics = [i for i in metrics if i in ["length", "tortuosity", "mean_curvature", "max_curvature"]]
-    all_segments, LSA_tree = get_segments_and_tree_from_dir(results_dir, branch_level_metrics)
+def get_top_n_major_branchs(stems, all_branchs, top_n, min_length):
+    major_branchs = []
+    for stem in stems:
+        branches_from_this_stem = [branch for branch in all_branchs if stem in branch["segments"]]
+        major_branch_length = 0
+        stem_major_branch = None
+        for branch in branches_from_this_stem:
+            if (branch["length"] > major_branch_length):
+                major_branch_length = branch["length"]
+                stem_major_branch = branch
+        if stem_major_branch["length"] >= min_length:      
+            major_branchs.append(stem_major_branch)
+        else:
+            print(f"Excluding major branch from stem {stem} due to length {stem_major_branch['length']} < {min_length}")
+    
+    major_branchs = sorted(major_branchs, key=lambda x: x["length"], reverse=True)
+    if top_n is None:
+        top_n_major_branchs = major_branchs
+    else:
+        top_n_major_branchs = major_branchs[:min(top_n, len(stems))]
+    return top_n_major_branchs
+
+def get_all_LSA_metrics(results_dir, metrics, affine_matrix=None, upsampled_TOF=None, top_n=None, terminal_min_length=None, min_branch_length=0):
+    branch_level_metrics = [i for i in metrics if i in ["length", "tortuosity", "mean_curvature", "max_curvature", "intensity_mean", "intensity_variation", "height"]]
+    all_segments, LSA_tree = get_segments_and_tree_from_dir(results_dir, branch_level_metrics, affine_matrix=affine_matrix, upsampled_TOF=upsampled_TOF, terminal_min_length=terminal_min_length)
     n_stems = len(LSA_tree)
 
     ## Get segment-level results
@@ -591,16 +700,26 @@ def get_all_LSA_metrics(results_dir, metrics):
     # Get branchs
     all_branchs = []
     for stem in list(LSA_tree.keys()):
-        all_branchs += get_full_branchs(stem, LSA_tree[stem], branch_level_metrics)
+        all_branchs += get_full_branchs(stem, LSA_tree[stem], branch_level_metrics, affine_matrix, upsampled_TOF)
     branch_metric_lsts = {}
     for metric in branch_level_metrics:
         branch_metric_lsts[metric] = [branch[metric] for branch in all_branchs]
+
+    # Get top n major branchs -- a major branch is the longest branch from each stem
+    major_branchs = get_top_n_major_branchs(list(LSA_tree.keys()), all_branchs, top_n=top_n, min_length=min_branch_length)
+    major_branch_metric_lsts = {}
+    for metric in branch_level_metrics:
+        major_branch_metric_lsts[metric] = [branch[metric] for branch in major_branchs]
 
     results = {
         "n_stems" : n_stems,
         "n_segments": len(all_segments),
         "n_branchs": len(all_branchs),
+        "n_branchs_above_cutoff": sum(x > min_branch_length for x in branch_metric_lsts["length"]),
+        "all_segments": all_segments,
+        "all_branchs": all_branchs,
     }
+    results["all_major_branchs"] = major_branchs
 
     # Get longest branch tortuosity
     if "longest_branch_tortuosity" in metrics:
@@ -608,6 +727,8 @@ def get_all_LSA_metrics(results_dir, metrics):
         longest_branch_idx = np.argmax(all_branch_lengths)
         longest_branch_tortuosity = all_branchs[longest_branch_idx]["tortuosity"]
         results["longest_branch_tortuosity"] = longest_branch_tortuosity
+
+    results["segment_length_sum"] = np.sum(segment_metric_lsts["length"]) # total length
 
     for metric in branch_level_metrics:
         results[f'segment_{metric}_mean'] = np.mean(segment_metric_lsts[metric])
@@ -619,10 +740,13 @@ def get_all_LSA_metrics(results_dir, metrics):
         results[f'branch_{metric}_std'] = np.std(branch_metric_lsts[metric])
         results[f'branch_{metric}_median'] = np.median(branch_metric_lsts[metric])
         results[f'branch_{metric}_max'] = np.max(branch_metric_lsts[metric])
+        
+        results[f'major_branch_{metric}_mean'] = np.mean(major_branch_metric_lsts[metric])
+        results[f'major_branch_{metric}_std'] = np.std(major_branch_metric_lsts[metric])
+        results[f'major_branch_{metric}_median'] = np.median(major_branch_metric_lsts[metric])
+        results[f'major_branch_{metric}_max'] = np.max(major_branch_metric_lsts[metric])
 
-    full_results = {"all_segments": all_segments,
-                    "all_branchs": all_branchs}
-    return results, full_results
+    return results
 
 def get_voxel_idx(world_idx, affine_matrix, world_coords="LPS", affine_coords="RAS"):
     # world_idx: Nx3 array of world coordinates
@@ -641,6 +765,106 @@ def get_voxel_idx(world_idx, affine_matrix, world_coords="LPS", affine_coords="R
     voxel_idx = np.round(np.dot(inverse_affine, world_idx_transformed)[:3,:]).astype(int) # 3xN
     return voxel_idx.T # Nx3
 
+###### Following functions are for calculating Fractal dimension ######
+def count_boxes(binary_array, box_size):
+    # Calculate the dimensions of the input binary array
+    depth, height, width = binary_array.shape
+
+    # Calculate the number of boxes along each axis
+    num_boxes_depth = depth // box_size
+    num_boxes_height = height // box_size
+    num_boxes_width = width // box_size
+
+    # Reshape the binary array into a new array with box_size x box_size x box_size boxes
+    reshaped_array = binary_array[:num_boxes_depth * box_size,
+                                  :num_boxes_height * box_size,
+                                  :num_boxes_width * box_size]
+    reshaped_array = reshaped_array.reshape(num_boxes_depth, box_size,
+                                            num_boxes_height, box_size,
+                                            num_boxes_width, box_size)
+
+    # Count the number of non-empty (containing at least one '1') boxes
+    num_non_empty_boxes = np.sum(reshaped_array.any(axis=(1, 3, 5)))
+    return num_non_empty_boxes
+
+
+def fractal_dimension_3d(binary_array, box_sizes=[8, 16, 32, 64]):
+    box_counts = []
+    for box_size in box_sizes:
+        box_count = count_boxes(binary_array, box_size)
+        box_counts.append(box_count)
+
+    # Calculate the fractal dimension using the log-log regression
+    x = np.log(box_sizes)
+    y = np.log(box_counts)
+    coeffs = np.polyfit(x, y, 1)
+    fractal_dimension = -coeffs[0]
+    return fractal_dimension
+
+def crop_to_object(binary_array):
+    """
+    Crops a 3D binary mask to the smallest bounding box containing the object.
+
+    Parameters:
+        binary_array (np.ndarray): A 3D binary mask (values 0 or 1).
+
+    Returns:
+        np.ndarray: Cropped binary array.
+    """
+    assert np.array_equal(binary_array, binary_array.astype(bool)), "Input must be binary (0 and 1)."
+
+    # Find the indices where the object exists
+    non_zero_indices = np.argwhere(binary_array)
+    min_bounds = non_zero_indices.min(axis=0)  # Minimum indices
+    max_bounds = non_zero_indices.max(axis=0) + 1  # Maximum indices (exclusive)
+    
+    # Crop the array
+    cropped_array = binary_array[
+        min_bounds[0]:max_bounds[0],
+        min_bounds[1]:max_bounds[1],
+        min_bounds[2]:max_bounds[2]
+    ]
+    
+    return cropped_array
+
+
+def fractal_dimension(binary_array):
+    """
+    Computes the fractal dimension of a 3D binary object using the box-counting method.
+    
+    Parameters:
+        binary_array (np.ndarray): A 3D binary array (values 0 or 1).
+    
+    Returns:
+        float: The estimated fractal dimension.
+    """
+    assert np.array_equal(binary_array, binary_array.astype(bool)), "Input must be binary (0 and 1)."
+    binary_array = crop_to_object(binary_array)
+    size = min(binary_array.shape)
+    box_sizes = 2 ** np.arange(int(np.log2(size)), 0, -1) # Define possible box sizes (powers of 2)
+    
+    counts = []
+    
+    for box_size in box_sizes:
+        num_boxes = np.ceil(np.array(binary_array.shape) / box_size).astype(int)
+        padded_array = np.zeros(num_boxes * box_size, dtype=binary_array.dtype) # Pad the array to make it divisible by the box size
+        padded_array[:binary_array.shape[0], :binary_array.shape[1], :binary_array.shape[2]] = binary_array
+        
+        # Reshape the padded array into boxes and count non-empty boxes
+        reshaped_array = padded_array.reshape(
+            num_boxes[0], box_size,
+            num_boxes[1], box_size,
+            num_boxes[2], box_size
+        )
+        non_empty_boxes = np.sum(reshaped_array.any(axis=(1, 3, 5)))
+        counts.append(non_empty_boxes)
+    
+    # Fit the data to a line in log-log space to calculate the fractal dimension
+    log_box_sizes = -np.log(box_sizes)  # Negative because size decreases
+    log_counts = np.log(counts)
+    fractal_dim = np.polyfit(log_box_sizes, log_counts, 1)[0]  # Slope of the line
+    
+    return fractal_dim
 
 if __name__ == '__main__':
     print("Running centerline_functions.py")
